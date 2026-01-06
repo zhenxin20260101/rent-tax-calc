@@ -3,37 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>租賃稅務試算工具 - 優化版</title>
+    <title>租賃稅務試算工具 - 最終優化版</title>
     <style>
         :root {
             --primary-color: #4a90e2;
             --success-color: #28a745;
             --danger-color: #d9534f;
+            --secondary-color: #6c757d;
             --bg-color: #f8f9fa;
         }
 
         body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; padding: 15px; line-height: 1.6; background-color: var(--bg-color); }
         .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
         h2 { color: #333; text-align: center; margin-bottom: 25px; border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; font-size: 1.5rem; }
         
-        .input-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 25px; background: #fff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; }
-        .input-item { display: flex; flex-direction: column; flex: 1; min-width: 250px; }
+        .input-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 25px; background: #fff; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; align-items: flex-end; }
+        .input-item { display: flex; flex-direction: column; flex: 1; min-width: 200px; }
         label { font-weight: bold; margin-bottom: 8px; color: #555; }
-        
-        /* 針對輸入框優化 */
-        input, select { padding: 14px; font-size: 18px; border: 1px solid #ced4da; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        input, select { padding: 12px; font-size: 18px; border: 1px solid #ced4da; border-radius: 6px; width: 100%; box-sizing: border-box; }
 
-        .table-responsive { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 700px; }
+        .btn-clear { background-color: var(--secondary-color); color: white; border: none; padding: 12px 25px; font-size: 18px; border-radius: 6px; cursor: pointer; transition: background 0.3s; height: 50px; }
+        .btn-clear:hover { background-color: #5a6268; }
+
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 750px; }
         th, td { border: 1px solid #dee2e6; padding: 12px; vertical-align: top; }
         th { background-color: var(--primary-color); color: white; text-align: center; white-space: nowrap; }
         
-        .mode-name { font-weight: bold; background-color: #fcfcfc; text-align: center; width: 130px; }
+        .mode-name { font-weight: bold; background-color: #fcfcfc; text-align: center; width: 140px; }
         .formula { font-size: 0.9em; color: #0056b3; display: block; margin-top: 8px; line-height: 1.6; background: #f0f7ff; padding: 12px; border-left: 4px solid var(--primary-color); border-radius: 0 4px 4px 0; word-break: break-all; }
         .highlight-val { font-weight: bold; color: var(--danger-color); font-size: 1.25em; display: block; }
         .tax-val { font-weight: bold; color: var(--success-color); font-size: 1.25em; text-align: center; display: block; }
         .unit { font-size: 0.8em; color: #888; font-weight: normal; margin-left: 2px; }
+        .placeholder-text { text-align: center; padding: 50px; color: #999; font-style: italic; }
     </style>
 </head>
 <body>
@@ -44,18 +46,19 @@
     <div class="input-group">
         <div class="input-item">
             <label>每月租金 (NTD)：</label>
-            <input type="number" id="rent" value="28000" inputmode="decimal" pattern="[0-9]*" oninput="calculate()">
+            <input type="number" id="rent" placeholder="請輸入金額" inputmode="decimal" pattern="[0-9]*" oninput="calculate()">
         </div>
         <div class="input-item">
             <label>個人綜合所得稅率：</label>
             <select id="taxRate" onchange="calculate()">
-                <option value="0.05">5%</option>
+                <option value="0.05" selected>5%</option>
                 <option value="0.12">12%</option>
-                <option value="0.20" selected>20%</option>
+                <option value="0.20">20%</option>
                 <option value="0.30">30%</option>
                 <option value="0.40">40%</option>
             </select>
         </div>
+        <button class="btn-clear" onclick="clearAll()">清除</button>
     </div>
 
     <div class="table-responsive">
@@ -67,7 +70,8 @@
                     <th style="width: 20%;">應繳稅額</th>
                 </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="resultBody">
+                </tbody>
         </table>
     </div>
 </div>
@@ -77,14 +81,31 @@ function fmt(num) {
     return Math.round(num).toLocaleString('en-US');
 }
 
-function calculate() {
-    const R = parseFloat(document.getElementById('rent').value) || 0;
-    const T = parseFloat(document.getElementById('taxRate').value);
-    const tbody = document.querySelector('#resultTable tbody');
-    const taxPerc = (T * 100) + "%";
-    tbody.innerHTML = '';
+function clearAll() {
+    document.getElementById('rent').value = '';
+    document.getElementById('taxRate').value = '0.05';
+    calculate();
+}
 
+function calculate() {
+    const rentInput = document.getElementById('rent');
+    const taxSelect = document.getElementById('taxRate');
+    const tbody = document.getElementById('resultBody');
+    
+    const R_val = rentInput.value;
+    
+    // 如果租金是空的，顯示提示訊息
+    if (R_val === "" || R_val === null) {
+        tbody.innerHTML = '<tr><td colspan="3" class="placeholder-text">請在上方輸入每月租金以開始計算</td></tr>';
+        return;
+    }
+
+    const R = parseFloat(R_val);
+    const T = parseFloat(taxSelect.value);
+    const taxPerc = (T * 100) + "%";
     const rentStr = fmt(R);
+
+    tbody.innerHTML = '';
 
     // 1. 房東自行出租
     const val1 = R * 12 * (1 - 0.43);
@@ -137,7 +158,10 @@ function calculate() {
         tbody.innerHTML += row;
     });
 }
+
+// 初始化
 calculate();
 </script>
+
 </body>
 </html>
